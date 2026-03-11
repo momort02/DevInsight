@@ -1,943 +1,1019 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DevInsight — Analyseur de Projets GitHub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <link rel="stylesheet" href="../assets/css/style.css" />
-  <!-- D3.js pour le graphe d'architecture -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
 </head>
 
 <body>
 
-  <!-- ═══════════════════════════════════════════════════════════
-     NAVIGATION
-════════════════════════════════════════════════════════════ -->
-  <nav class="navbar">
-    <a class="navbar-brand" href="#" onclick="showView('home')">
-      <div class="logo-icon">DI</div>
-      DevInsight
-    </a>
+<!-- ═══ CANVAS PARTICULES ══════════════════════════════════════ -->
+<canvas id="particles-canvas"></canvas>
 
-    <ul class="navbar-nav">
-      <li><a class="nav-link active" id="nav-home" onclick="showView('home')" href="#">Analyser</a></li>
-      <li><a class="nav-link" id="nav-arch" onclick="showView('arch')" href="#">Architecture</a></li>
-      <li><a class="nav-link" id="nav-toolbox" onclick="showView('toolbox')" href="#">Toolbox</a></li>
-    </ul>
-
-    <div class="navbar-right">
-      <div class="status-badge">
-        <span class="status-dot"></span>
-        <span id="api-status">Chargement…</span>
-      </div>
-      <button class="btn-token" onclick="openTokenModal()" title="Configurer un token GitHub">
-        ⚙ Token
-      </button>
+<!-- ═══ NAVIGATION ════════════════════════════════════════════ -->
+<nav class="navbar" id="navbar">
+  <a class="navbar-brand" href="#" onclick="showView('home')">
+    <div class="logo-icon">
+      <span class="logo-d">D</span><span class="logo-i">I</span>
     </div>
-  </nav>
+    <span class="brand-text">Dev<strong>Insight</strong></span>
+  </a>
 
-  <!-- ═══════════════════════════════════════════════════════════
-     MAIN CONTENT
-════════════════════════════════════════════════════════════ -->
-  <main>
+  <ul class="navbar-nav">
+    <li><a class="nav-link active" id="nav-home"    onclick="showView('home')"    href="#">Analyser</a></li>
+    <li><a class="nav-link"        id="nav-compare" onclick="showView('compare')" href="#">Comparer</a></li>
+    <li><a class="nav-link"        id="nav-arch"    onclick="showView('arch')"    href="#">Architecture</a></li>
+    <li><a class="nav-link"        id="nav-toolbox" onclick="showView('toolbox')" href="#">Toolbox</a></li>
+  </ul>
 
-    <!-- ── VIEW : HOME / ANALYSE ─────────────────────────────── -->
-    <div class="view active" id="view-home">
+  <div class="navbar-right">
+    <div class="rate-limit-badge" id="rate-limit-badge">
+      <span class="rl-icon">⚡</span>
+      <span id="api-status">—</span>
+    </div>
+    <button class="btn-theme" onclick="toggleTheme()" title="Changer le thème" id="theme-btn">☀</button>
+    <button class="btn-token" onclick="openTokenModal()" id="token-btn">
+      <span id="token-btn-icon">⚙</span> Token
+    </button>
+  </div>
+</nav>
 
-      <!-- Hero -->
-      <section class="hero">
-        <div class="hero-badge">✦ GitHub Repository Analyzer</div>
-        <h1>Analyse ton projet<br />GitHub en secondes</h1>
-        <p>Visualise l'architecture, les langages, la qualité du code et l'activité de n'importe quel repository public.
-        </p>
+<!-- ═══ MAIN ═══════════════════════════════════════════════════ -->
+<main>
 
-        <!-- Search Box -->
+  <!-- ──────────────────────────────────────────────────────────
+       VIEW : HOME
+  ─────────────────────────────────────────────────────────── -->
+  <div class="view active" id="view-home">
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-eyebrow">
+        <span class="eyebrow-dot"></span>
+        GitHub Repository Analyzer
+        <span class="eyebrow-dot"></span>
+      </div>
+      <h1 class="hero-title">
+        <span class="title-line" data-delay="0">Analyse</span>
+        <span class="title-line accent-line" data-delay="1">n'importe quel</span>
+        <span class="title-line" data-delay="2">repo GitHub</span>
+      </h1>
+      <p class="hero-sub">Architecture · Qualité · Activité · Dépendances</p>
+
+      <!-- Search -->
+      <div class="search-wrap">
         <div class="search-box">
-          <div class="input-group">
-            <span class="input-icon">⌥</span>
-            <input type="text" id="repo-url" placeholder="https://github.com/owner/repository" autocomplete="off"
-              spellcheck="false" />
-            <button class="btn-analyze" id="analyze-btn" onclick="analyzeRepo()">
-              <span id="btn-text">Analyser</span>
-              <span>→</span>
-            </button>
-          </div>
-          <div class="search-hint">Appuyez sur Entrée · API GitHub publique (60 req/h sans token)</div>
+          <span class="search-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </span>
+          <input type="text" id="repo-url"
+            placeholder="https://github.com/owner/repository"
+            autocomplete="off" spellcheck="false" />
+          <button class="btn-analyze" id="analyze-btn" onclick="analyzeRepo()">
+            <span id="btn-text">Analyser</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
         </div>
-
-        <!-- Examples -->
-        <div class="example-repos">
-          <span style="font-size:0.75rem;color:var(--text-muted)">Exemples :</span>
-          <span class="example-chip" onclick="fillExample('https://github.com/vercel/next.js')">vercel/next.js</span>
-          <span class="example-chip" onclick="fillExample('https://github.com/facebook/react')">facebook/react</span>
-          <span class="example-chip"
-            onclick="fillExample('https://github.com/expressjs/express')">expressjs/express</span>
-          <span class="example-chip" onclick="fillExample('https://github.com/vuejs/vue')">vuejs/vue</span>
-        </div>
-      </section>
-
-      <!-- Error -->
-      <div class="error-box" id="error-box">
-        <span>⚠</span>
-        <span id="error-msg">Erreur</span>
+        <p class="search-hint">↵ Entrée pour lancer · <span id="hint-rate">60 req/h sans token</span></p>
       </div>
 
-      <!-- Loader -->
-      <div id="loader">
-        <div class="loader-ring"></div>
-        <div class="loader-steps" id="loader-steps">
-          <div class="loader-step">Connexion à l'API GitHub…</div>
-        </div>
+      <!-- Examples -->
+      <div class="examples-row">
+        <span class="examples-label">Essayer :</span>
+        <button class="chip" onclick="fillExample('https://github.com/vercel/next.js')">vercel/next.js</button>
+        <button class="chip" onclick="fillExample('https://github.com/facebook/react')">facebook/react</button>
+        <button class="chip" onclick="fillExample('https://github.com/expressjs/express')">expressjs/express</button>
+        <button class="chip" onclick="fillExample('https://github.com/vuejs/vue')">vuejs/vue</button>
+        <button class="chip" onclick="fillExample('https://github.com/torvalds/linux')">torvalds/linux</button>
       </div>
+    </section>
 
-      <!-- Results -->
-      <div id="results">
-        <!-- Repo Header -->
-        <div class="results-header">
-          <img class="repo-avatar" id="r-avatar" src="" alt="avatar" />
-          <div class="repo-meta">
+    <!-- Error -->
+    <div class="alert alert-error" id="error-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span id="error-msg">Erreur</span>
+    </div>
+
+    <!-- Loader -->
+    <div id="loader">
+      <div class="loader-orb"></div>
+      <div class="loader-steps" id="loader-steps"></div>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+
+      <!-- Repo Header -->
+      <div class="repo-header-card">
+        <img class="repo-avatar" id="r-avatar" src="" alt="" />
+        <div class="repo-meta">
+          <div class="repo-name-row">
             <h2 id="r-fullname">owner/repo</h2>
-            <p id="r-desc">Description du projet</p>
-            <div class="repo-topics" id="r-topics"></div>
+            <a id="r-gh-link" href="#" target="_blank" rel="noopener" class="repo-gh-link" title="Ouvrir sur GitHub">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+            </a>
           </div>
-          <div style="margin-left:auto;text-align:right">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--text-muted)">Type de projet
-            </div>
-            <div id="r-type" style="font-size:0.875rem;font-weight:600;color:var(--accent)">–</div>
-            <div id="r-license" style="font-size:0.7rem;color:var(--text-muted);margin-top:2px"></div>
+          <p id="r-desc" class="repo-desc">–</p>
+          <div class="repo-meta-row">
+            <span class="meta-pill" id="r-branch">–</span>
+            <span class="meta-pill" id="r-license">–</span>
+            <span class="meta-pill" id="r-created">–</span>
+            <span class="meta-pill" id="r-updated">–</span>
           </div>
+          <div class="repo-topics" id="r-topics"></div>
+        </div>
+        <div class="repo-header-actions">
+          <div class="r-type-badge" id="r-type">–</div>
+          <button class="btn-export" onclick="exportReport('json')" title="Export JSON">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            JSON
+          </button>
+          <button class="btn-export" onclick="exportReport('md')" title="Export Markdown">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            MD
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-strip" id="stats-strip">
+        <div class="stat-pill"><span class="sp-val" id="s-stars">–</span><span class="sp-lbl">Stars</span></div>
+        <div class="stat-pill"><span class="sp-val" id="s-forks">–</span><span class="sp-lbl">Forks</span></div>
+        <div class="stat-pill"><span class="sp-val" id="s-issues">–</span><span class="sp-lbl">Issues</span></div>
+        <div class="stat-pill"><span class="sp-val" id="s-files">–</span><span class="sp-lbl">Fichiers</span></div>
+        <div class="stat-pill"><span class="sp-val" id="s-dirs">–</span><span class="sp-lbl">Dossiers</span></div>
+        <div class="stat-pill"><span class="sp-val" id="s-loc">–</span><span class="sp-lbl">Lignes ~</span></div>
+        <div class="stat-pill"><span class="sp-val" id="s-lang">–</span><span class="sp-lbl">Langages</span></div>
+        <div class="stat-pill"><span class="sp-val" id="s-watchers">–</span><span class="sp-lbl">Watchers</span></div>
+      </div>
+
+      <!-- Grid -->
+      <div class="results-grid">
+
+        <!-- Langages -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🎨 Langages</div>
+          </div>
+          <div class="lang-list" id="lang-list"></div>
         </div>
 
-        <!-- Stats Grid -->
-        <div class="section-title">📊 Statistiques</div>
-        <div class="results-grid" id="stats-grid">
-
-          <!-- Chiffres clés -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title"><span class="icon">📁</span> Métriques</div>
-              <span id="r-branch"
-                style="font-size:0.72rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace"></span>
-            </div>
-            <div class="stat-grid">
-              <div class="stat-item">
-                <div class="stat-value" id="s-files">–</div>
-                <div class="stat-label">Fichiers</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-value" id="s-dirs">–</div>
-                <div class="stat-label">Dossiers</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-value" id="s-loc">–</div>
-                <div class="stat-label">Lignes ~</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-value" id="s-lang">–</div>
-                <div class="stat-label">Langages</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-value" id="s-stars">–</div>
-                <div class="stat-label">⭐ Stars</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-value" id="s-forks">–</div>
-                <div class="stat-label">🍴 Forks</div>
-              </div>
-            </div>
+        <!-- Score qualité -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🎯 Score Qualité</div>
+            <span id="q-label" class="card-badge"></span>
           </div>
-
-          <!-- Langages -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title"><span class="icon">🎨</span> Langages</div>
-            </div>
-            <div class="lang-list" id="lang-list"></div>
-          </div>
-
-          <!-- Score qualité -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title"><span class="icon">🎯</span> Score Qualité</div>
-              <span id="q-label" style="font-size:0.75rem;color:var(--text-muted)"></span>
-            </div>
-            <div class="score-display">
-              <div class="score-circle" id="score-circle">
+          <div class="score-display">
+            <div class="score-circle" id="score-circle">
+              <svg class="score-ring" viewBox="0 0 100 100">
+                <circle class="score-ring-bg" cx="50" cy="50" r="42"/>
+                <circle class="score-ring-fill" id="score-ring-fill" cx="50" cy="50" r="42"/>
+              </svg>
+              <div class="score-inner">
                 <div class="score-grade" id="score-grade">–</div>
                 <div class="score-total" id="score-total">/ 100</div>
               </div>
-              <div class="score-details" id="score-details"></div>
             </div>
+            <div class="score-details" id="score-details"></div>
           </div>
-
         </div>
 
-        <!-- Structure + Commits -->
-        <div class="results-grid" style="margin-top:0">
-
-          <!-- Structure -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title"><span class="icon">🌲</span> Structure du projet</div>
-              <button class="btn-tool" onclick="showView('arch')" style="font-size:0.72rem">Voir graphe →</button>
-            </div>
-            <div class="tree-container" id="tree-container"></div>
+        <!-- Dépendances -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📦 Dépendances</div>
+            <span class="card-badge" id="deps-count">–</span>
           </div>
-
-          <!-- Commits -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title"><span class="icon">📝</span> Derniers commits</div>
-            </div>
-            <div class="commit-list" id="commit-list"></div>
+          <div id="deps-list" class="deps-list">
+            <div class="deps-empty">Analysez un repo avec package.json ou requirements.txt</div>
           </div>
-
-          <!-- Contributeurs -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title"><span class="icon">👥</span> Contributeurs</div>
-            </div>
-            <div class="contributors-list" id="contributors-list"></div>
-          </div>
-
         </div>
-      </div><!-- /#results -->
-    </div><!-- /#view-home -->
 
-
-    <!-- ── VIEW : ARCHITECTURE ───────────────────────────────── -->
-    <div class="view" id="view-arch">
-      <div style="margin-bottom:1.5rem">
-        <h2 style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:700;margin-bottom:0.4rem">
-          Visualiseur d'Architecture
-        </h2>
-        <p style="color:var(--text-secondary);font-size:0.875rem">
-          Graphe interactif des dossiers et fichiers du projet. <span id="arch-hint"
-            style="color:var(--text-muted)">Analysez d'abord un repository.</span>
-        </p>
       </div>
 
-      <div class="card" style="padding:0">
-        <div id="graph-container">
-          <svg id="graph-canvas"></svg>
-          <div class="graph-legend">
-            <div class="legend-item">
-              <div class="legend-dot" style="background:#38bdf8"></div> Dossier
-            </div>
-            <div class="legend-item">
-              <div class="legend-dot" style="background:#818cf8"></div> Fichier
-            </div>
-            <div class="legend-item">
-              <div class="legend-dot" style="background:#34d399"></div> Config
-            </div>
-          </div>
-          <div class="graph-controls">
-            <button class="graph-btn" onclick="resetZoom()" title="Reset zoom">⌂</button>
-            <button class="graph-btn" onclick="zoomIn()" title="Zoom +">+</button>
-            <button class="graph-btn" onclick="zoomOut()" title="Zoom -">−</button>
-          </div>
-          <div id="graph-placeholder"
-            style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-muted);gap:0.5rem;pointer-events:none">
-            <div style="font-size:2rem">🌐</div>
-            <div style="font-size:0.875rem">Analysez un repository pour voir le graphe</div>
-          </div>
+      <!-- Activité commits -->
+      <div class="card card-full">
+        <div class="card-header">
+          <div class="card-title">📈 Activité (12 derniers mois)</div>
+          <span class="card-badge" id="activity-total">–</span>
+        </div>
+        <div class="activity-chart-wrap">
+          <canvas id="activity-chart"></canvas>
+          <div id="activity-placeholder" class="activity-placeholder">Chargement de l'activité…</div>
         </div>
       </div>
-    </div><!-- /#view-arch -->
+
+      <!-- Structure + Commits + Contributeurs -->
+      <div class="results-grid results-grid-3">
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🌲 Structure</div>
+            <button class="card-action" onclick="showView('arch')">Graphe →</button>
+          </div>
+          <div class="tree-container" id="tree-container"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📝 Commits récents</div>
+            <span class="card-badge" id="commits-count">–</span>
+          </div>
+          <div class="commit-list" id="commit-list"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">👥 Contributeurs</div>
+          </div>
+          <div class="contributors-list" id="contributors-list"></div>
+        </div>
+
+      </div>
+    </div><!-- /#results -->
+  </div><!-- /#view-home -->
 
 
-    <!-- ── VIEW : TOOLBOX ────────────────────────────────────── -->
-    <div class="view" id="view-toolbox">
-      <div class="toolbox-header">
-        <h2>🛠 Boîte à Outils</h2>
-        <p>Outils utilitaires pour développeurs — tout fonctionne en local, sans serveur.</p>
+  <!-- ──────────────────────────────────────────────────────────
+       VIEW : COMPARER
+  ─────────────────────────────────────────────────────────── -->
+  <div class="view" id="view-compare">
+    <div class="compare-header">
+      <h2>Comparaison de Repositories</h2>
+      <p>Analysez deux projets GitHub côte à côte</p>
+    </div>
+
+    <div class="compare-inputs">
+      <div class="compare-input-col">
+        <label class="compare-label">Repo A</label>
+        <div class="compare-search">
+          <input type="text" id="compare-url-a" class="tool-input" placeholder="https://github.com/owner/repo-a" />
+          <button class="btn-analyze" onclick="runCompare()">Comparer →</button>
+        </div>
+      </div>
+      <div class="compare-vs">VS</div>
+      <div class="compare-input-col">
+        <label class="compare-label">Repo B</label>
+        <div class="compare-search">
+          <input type="text" id="compare-url-b" class="tool-input" placeholder="https://github.com/owner/repo-b" />
+        </div>
+      </div>
+    </div>
+
+    <div id="compare-error" class="alert alert-error" style="display:none"></div>
+    <div id="compare-loader" style="display:none;text-align:center;padding:2rem">
+      <div class="loader-orb" style="margin:0 auto"></div>
+      <p style="color:var(--text-muted);margin-top:1rem;font-size:0.875rem">Analyse en cours…</p>
+    </div>
+
+    <div id="compare-results" style="display:none">
+      <!-- En-têtes repos -->
+      <div class="compare-repo-headers">
+        <div class="compare-repo-card" id="cmp-header-a"></div>
+        <div class="compare-repo-card" id="cmp-header-b"></div>
       </div>
 
-      <div class="tools-grid">
-
-        <!-- ══ 1. JSON FORMATTER ══════════════════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-json">{ }</div>
-              <div>
-                <div class="tool-name">JSON Formatter</div>
-                <div class="tool-desc">Formater, minifier et valider du JSON</div>
-              </div>
-            </div>
-          </div>
-          <textarea class="tool-textarea" id="json-input" placeholder='{"nom":"Alice","age":30}'></textarea>
-          <div class="tool-actions">
-            <button class="btn-tool primary" onclick="formatJson()">⚡ Formater</button>
-            <button class="btn-tool" onclick="minifyJson()">⚙ Minifier</button>
-            <button class="btn-tool" onclick="validateJson()">✓ Valider</button>
-            <button class="btn-tool" onclick="clearTool('json-input','json-output')">✕</button>
-          </div>
-          <div class="tool-output-header">
-            <span class="tool-output-label">Résultat</span>
-            <button class="btn-copy-result" onclick="copyToolOutput('json-output')">⎘ Copier</button>
-          </div>
-          <div class="tool-output" id="json-output">Le JSON formaté apparaîtra ici…</div>
+      <!-- Tableau comparatif -->
+      <div class="card card-full" style="margin-top:1.5rem">
+        <div class="card-header"><div class="card-title">📊 Comparaison détaillée</div></div>
+        <div class="compare-table-wrap">
+          <table class="compare-table" id="compare-table"></table>
         </div>
-
-        <!-- ══ 2. UUID GENERATOR ══════════════════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-uuid">⬡</div>
-              <div>
-                <div class="tool-name">Générateur UUID</div>
-                <div class="tool-desc">Identifiants uniques v4 dans plusieurs formats</div>
-              </div>
-            </div>
-          </div>
-          <div class="uuid-display" id="uuid-display">Cliquez sur Générer</div>
-          <div class="tool-actions" style="margin-top:0.75rem">
-            <button class="btn-tool primary" onclick="generateUUID()">⚡ Générer</button>
-            <button class="btn-tool" onclick="generateMultipleUUIDs()">×5 Batch</button>
-            <button class="btn-copy-result" onclick="copyToolOutput('uuid-display')">⎘ Copier</button>
-          </div>
-          <div class="tool-sub-label" style="margin-top:0.75rem">Formats</div>
-          <div class="tool-actions">
-            <button class="btn-tool" onclick="generateUUID('uppercase')">MAJUSCULES</button>
-            <button class="btn-tool" onclick="generateUUID('no-hyphens')">Sans tirets</button>
-            <button class="btn-tool" onclick="generateUUID('braces')">{Accolades}</button>
-          </div>
-        </div>
-
-        <!-- ══ 3. BASE64 ══════════════════════════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-base64">64</div>
-              <div>
-                <div class="tool-name">Encodeur Base64</div>
-                <div class="tool-desc">Encoder et décoder en Base64 / URL-safe</div>
-              </div>
-            </div>
-          </div>
-          <textarea class="tool-textarea" id="b64-input" placeholder="Texte à encoder ou Base64 à décoder…"></textarea>
-          <div class="tool-actions">
-            <button class="btn-tool primary" onclick="encodeBase64()">↑ Encoder</button>
-            <button class="btn-tool" onclick="decodeBase64()">↓ Décoder</button>
-            <button class="btn-tool" onclick="encodeUrlSafe()">🔗 URL-safe</button>
-            <button class="btn-tool" onclick="clearTool('b64-input','b64-output')">✕</button>
-          </div>
-          <div class="tool-output-header">
-            <span class="tool-output-label">Résultat</span>
-            <button class="btn-copy-result" onclick="copyToolOutput('b64-output')">⎘ Copier</button>
-          </div>
-          <div class="tool-output" id="b64-output">Le résultat apparaîtra ici…</div>
-        </div>
-
-        <!-- ══ 4. REGEX TESTER ════════════════════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-regex">.*</div>
-              <div>
-                <div class="tool-name">Testeur Regex</div>
-                <div class="tool-desc">Tester des expressions régulières en live</div>
-              </div>
-            </div>
-          </div>
-          <div class="regex-row">
-            <span class="regex-slash">/</span>
-            <input class="tool-input" id="regex-pattern" placeholder="pattern" oninput="testRegex()" />
-            <span class="regex-slash">/</span>
-            <input class="tool-input regex-flags" id="regex-flags" value="gi" oninput="testRegex()" />
-          </div>
-          <textarea class="tool-textarea" id="regex-text" placeholder="Texte à tester…" oninput="testRegex()"
-            style="margin-top:0.5rem;min-height:70px"></textarea>
-          <div class="tool-sub-label" style="margin-top:0.5rem">Patterns rapides</div>
-          <div class="tool-actions">
-            <button class="btn-tool" onclick="setRegexPreset('email')">Email</button>
-            <button class="btn-tool" onclick="setRegexPreset('url')">URL</button>
-            <button class="btn-tool" onclick="setRegexPreset('ip')">IP</button>
-            <button class="btn-tool" onclick="setRegexPreset('phone')">Tél</button>
-            <button class="btn-tool" onclick="setRegexPreset('date')">Date</button>
-            <button class="btn-tool" onclick="setRegexPreset('hex')">Hex</button>
-          </div>
-          <div class="tool-output-header">
-            <span class="tool-output-label" id="regex-count">Matches : –</span>
-            <button class="btn-copy-result" onclick="copyToolOutput('regex-output')">⎘ Copier</button>
-          </div>
-          <div class="tool-output" id="regex-output">Entrez un pattern et un texte…</div>
-        </div>
-
-        <!-- ══ 5. TIMESTAMP ═══════════════════════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-time">⏱</div>
-              <div>
-                <div class="tool-name">Convertisseur Timestamp</div>
-                <div class="tool-desc">Unix timestamp ↔ date lisible</div>
-              </div>
-            </div>
-          </div>
-          <div class="tool-sub-label">Timestamp Unix → Date</div>
-          <div class="tool-actions" style="margin-bottom:0.5rem">
-            <input class="tool-input" id="ts-input" type="number" placeholder="1700000000" oninput="convertTimestamp()"
-              style="flex:1" />
-            <button class="btn-tool"
-              onclick="document.getElementById('ts-input').value=Math.floor(Date.now()/1000);convertTimestamp()">Maintenant</button>
-          </div>
-          <div class="ts-grid">
-            <div class="ts-item">
-              <div class="ts-label">UTC</div>
-              <div class="ts-value" id="ts-utc">–</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Locale</div>
-              <div class="ts-value" id="ts-local">–</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">ISO 8601</div>
-              <div class="ts-value" id="ts-iso">–</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Relative</div>
-              <div class="ts-value" id="ts-relative">–</div>
-            </div>
-          </div>
-          <div class="tool-sub-label" style="margin-top:0.75rem">Date → Timestamp Unix</div>
-          <input class="tool-input" id="date-input" type="datetime-local" oninput="convertDate()"
-            style="width:100%;margin-bottom:0.4rem" />
-          <div class="tool-output-header">
-            <span class="tool-output-label">Résultat</span>
-            <button class="btn-copy-result" onclick="copyToolOutput('date-output')">⎘</button>
-          </div>
-          <div class="tool-output" id="date-output" style="min-height:auto;padding:0.5rem">–</div>
-          <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border)">
-            <div class="tool-sub-label">Horloge Unix live</div>
-            <div id="ts-live"
-              style="font-family:'JetBrains Mono',monospace;font-size:1rem;color:var(--accent);letter-spacing:2px">–
-            </div>
-          </div>
-        </div>
-
-        <!-- ══ 6. URL ENCODER / PARSER ════════════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-url">🔗</div>
-              <div>
-                <div class="tool-name">URL Encoder / Parser</div>
-                <div class="tool-desc">Encoder, décoder et décomposer une URL</div>
-              </div>
-            </div>
-          </div>
-          <textarea class="tool-textarea" id="url-input" placeholder="https://example.com/path?foo=hello world&bar=café"
-            style="min-height:70px"></textarea>
-          <div class="tool-actions">
-            <button class="btn-tool primary" onclick="encodeUrl()">↑ Encoder</button>
-            <button class="btn-tool" onclick="decodeUrl()">↓ Décoder</button>
-            <button class="btn-tool" onclick="parseUrl()">🔍 Parser</button>
-            <button class="btn-tool" onclick="clearTool('url-input','url-output')">✕</button>
-          </div>
-          <div class="tool-output-header">
-            <span class="tool-output-label">Résultat</span>
-            <button class="btn-copy-result" onclick="copyToolOutput('url-output')">⎘ Copier</button>
-          </div>
-          <div class="tool-output" id="url-output">Le résultat apparaîtra ici…</div>
-        </div>
-
-        <!-- ══ 7. GÉNÉRATEUR DE MOT DE PASSE ═════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-pwd">🔐</div>
-              <div>
-                <div class="tool-name">Générateur de Mot de Passe</div>
-                <div class="tool-desc">Mots de passe forts et personnalisables</div>
-              </div>
-            </div>
-          </div>
-          <div class="pwd-display-wrap">
-            <div class="uuid-display" id="pwd-display" style="font-size:0.85rem;word-break:break-all">Cliquez sur
-              Générer</div>
-            <button class="btn-copy-result" onclick="copyToolOutput('pwd-display')"
-              style="margin-top:0.4rem;align-self:flex-end">⎘ Copier</button>
-          </div>
-          <div class="pwd-options">
-            <label class="pwd-option">
-              <input type="checkbox" id="pwd-upper" checked /> Majuscules (A-Z)
-            </label>
-            <label class="pwd-option">
-              <input type="checkbox" id="pwd-lower" checked /> Minuscules (a-z)
-            </label>
-            <label class="pwd-option">
-              <input type="checkbox" id="pwd-numbers" checked /> Chiffres (0-9)
-            </label>
-            <label class="pwd-option">
-              <input type="checkbox" id="pwd-symbols" /> Symboles (!@#$…)
-            </label>
-          </div>
-          <div class="pwd-length-row">
-            <span class="tool-sub-label" style="margin:0">Longueur : <strong id="pwd-len-label">16</strong></span>
-            <input type="range" id="pwd-length" min="8" max="64" value="16"
-              oninput="document.getElementById('pwd-len-label').textContent=this.value"
-              style="flex:1;accent-color:var(--accent)" />
-          </div>
-          <div class="tool-actions" style="margin-top:0.5rem">
-            <button class="btn-tool primary" onclick="generatePassword()">⚡ Générer</button>
-            <button class="btn-tool" onclick="generateMultiplePasswords()">×5 Batch</button>
-          </div>
-          <div id="pwd-strength" class="pwd-strength-bar" style="margin-top:0.6rem"></div>
-        </div>
-
-        <!-- ══ 8. CONVERTISSEUR DE COULEURS ══════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-color">🎨</div>
-              <div>
-                <div class="tool-name">Convertisseur Couleurs</div>
-                <div class="tool-desc">HEX ↔ RGB ↔ HSL en temps réel</div>
-              </div>
-            </div>
-          </div>
-          <div class="color-preview-row">
-            <input type="color" id="color-picker" value="#38bdf8" oninput="onColorPickerChange()"
-              class="color-picker-native" />
-            <div class="color-preview-swatch" id="color-swatch" style="background:#38bdf8"></div>
-            <span id="color-name" style="font-size:0.75rem;color:var(--text-secondary)">Sky Blue</span>
-          </div>
-          <div class="color-inputs-grid">
-            <div class="color-input-group">
-              <label class="tool-sub-label">HEX</label>
-              <input class="tool-input" id="color-hex" value="#38bdf8" oninput="convertFromHex()"
-                placeholder="#rrggbb" />
-            </div>
-            <div class="color-input-group">
-              <label class="tool-sub-label">RGB</label>
-              <input class="tool-input" id="color-rgb" value="56, 189, 248" oninput="convertFromRgb()"
-                placeholder="r, g, b" />
-            </div>
-            <div class="color-input-group">
-              <label class="tool-sub-label">HSL</label>
-              <input class="tool-input" id="color-hsl" value="199°, 92%, 60%" oninput="convertFromHsl()"
-                placeholder="h°, s%, l%" />
-            </div>
-            <div class="color-input-group">
-              <label class="tool-sub-label">CSS var</label>
-              <input class="tool-input" id="color-css" readonly style="cursor:pointer"
-                onclick="copyToolOutput('color-css')" />
-            </div>
-          </div>
-          <div class="tool-actions" style="margin-top:0.5rem">
-            <button class="btn-tool" onclick="copyField('color-hex')">⎘ HEX</button>
-            <button class="btn-tool" onclick="copyField('color-rgb')">⎘ RGB</button>
-            <button class="btn-tool" onclick="copyField('color-hsl')">⎘ HSL</button>
-          </div>
-        </div>
-
-        <!-- ══ 9. COMPTEUR DE TEXTE ═══════════════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-text">Aa</div>
-              <div>
-                <div class="tool-name">Compteur de Texte</div>
-                <div class="tool-desc">Caractères, mots, lignes, temps de lecture</div>
-              </div>
-            </div>
-          </div>
-          <textarea class="tool-textarea" id="text-input" placeholder="Collez votre texte ici…" oninput="analyzeText()"
-            style="min-height:100px"></textarea>
-          <div class="text-stats-grid">
-            <div class="ts-item">
-              <div class="ts-label">Caractères</div>
-              <div class="ts-value" id="tc-chars">0</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Sans espaces</div>
-              <div class="ts-value" id="tc-nospace">0</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Mots</div>
-              <div class="ts-value" id="tc-words">0</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Lignes</div>
-              <div class="ts-value" id="tc-lines">0</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Phrases</div>
-              <div class="ts-value" id="tc-sentences">0</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Lecture ~</div>
-              <div class="ts-value" id="tc-read">0s</div>
-            </div>
-          </div>
-          <div class="tool-actions" style="margin-top:0.5rem">
-            <button class="btn-tool" onclick="textToUpper()">UPPER</button>
-            <button class="btn-tool" onclick="textToLower()">lower</button>
-            <button class="btn-tool" onclick="textToTitleCase()">Title</button>
-            <button class="btn-tool" onclick="trimText()">Trim</button>
-            <button class="btn-tool" onclick="clearTool('text-input','')">✕</button>
-          </div>
-        </div>
-
-        <!-- ══ 10. FORMATEUR DE NOMBRES ═══════════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-num">#</div>
-              <div>
-                <div class="tool-name">Formateur de Nombres</div>
-                <div class="tool-desc">Bytes, durées, bases numériques</div>
-              </div>
-            </div>
-          </div>
-          <input class="tool-input" id="num-input" type="number" placeholder="Entrez un nombre…"
-            oninput="formatNumber()" style="width:100%;margin-bottom:0.6rem" />
-          <div class="ts-grid" id="num-results">
-            <div class="ts-item">
-              <div class="ts-label">Formaté FR</div>
-              <div class="ts-value" id="nf-fr">–</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Formaté EN</div>
-              <div class="ts-value" id="nf-en">–</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Binaire</div>
-              <div class="ts-value" id="nf-bin">–</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Hexadécimal</div>
-              <div class="ts-value" id="nf-hex">–</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Octal</div>
-              <div class="ts-value" id="nf-oct">–</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Taille (bytes)</div>
-              <div class="ts-value" id="nf-bytes">–</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Durée (sec)</div>
-              <div class="ts-value" id="nf-duration">–</div>
-            </div>
-            <div class="ts-item">
-              <div class="ts-label">Scientifique</div>
-              <div class="ts-value" id="nf-sci">–</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ══ 12. QR CODE GENERATOR ══════════════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-qr">▦</div>
-              <div>
-                <div class="tool-name">Générateur QR Code</div>
-                <div class="tool-desc">Texte, URL, email, WiFi → QR Code SVG</div>
-              </div>
-            </div>
-          </div>
-          <div class="tool-sub-label">Type</div>
-          <div class="tool-actions" style="margin-bottom:0.6rem">
-            <button class="btn-tool primary" id="qr-type-url" onclick="setQrType('url')">URL</button>
-            <button class="btn-tool" id="qr-type-text" onclick="setQrType('text')">Texte</button>
-            <button class="btn-tool" id="qr-type-email" onclick="setQrType('email')">Email</button>
-            <button class="btn-tool" id="qr-type-wifi" onclick="setQrType('wifi')">WiFi</button>
-            <button class="btn-tool" id="qr-type-tel" onclick="setQrType('tel')">Téléphone</button>
-          </div>
-          <div id="qr-fields">
-            <input class="tool-input" id="qr-input" style="width:100%" placeholder="https://example.com"
-              oninput="generateQR()" />
-          </div>
-          <div id="qr-wifi-fields" style="display:none;flex-direction:column;gap:0.4rem;margin-top:0.4rem">
-            <input class="tool-input" id="qr-wifi-ssid" placeholder="Nom du réseau (SSID)" oninput="generateQR()" />
-            <input class="tool-input" id="qr-wifi-pass" placeholder="Mot de passe" oninput="generateQR()" />
-            <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.2rem">
-              <span class="tool-sub-label" style="margin:0">Sécurité :</span>
-              <select id="qr-wifi-enc" class="tool-input" style="width:auto" onchange="generateQR()">
-                <option value="WPA">WPA/WPA2</option>
-                <option value="WEP">WEP</option>
-                <option value="nopass">Aucune</option>
-              </select>
-            </div>
-          </div>
-          <div id="qr-email-fields" style="display:none;flex-direction:column;gap:0.4rem;margin-top:0.4rem">
-            <input class="tool-input" id="qr-email-to" placeholder="destinataire@email.com" oninput="generateQR()" />
-            <input class="tool-input" id="qr-email-subject" placeholder="Sujet (optionnel)" oninput="generateQR()" />
-            <textarea class="tool-textarea" id="qr-email-body" placeholder="Corps du message (optionnel)"
-              style="min-height:50px" oninput="generateQR()"></textarea>
-          </div>
-          <div class="qr-preview-area">
-            <div id="qr-canvas-wrap">
-              <div id="qr-placeholder">Entrez du contenu pour générer le QR Code</div>
-            </div>
-            <div class="qr-actions">
-              <button class="btn-tool primary" onclick="downloadQR()">⬇ Télécharger SVG</button>
-              <button class="btn-tool" onclick="copyQRSvg()">⎘ Copier SVG</button>
-              <div id="qr-size-row" style="display:flex;align-items:center;gap:0.5rem;margin-left:auto">
-                <span class="tool-sub-label" style="margin:0;white-space:nowrap">Taille : <strong
-                    id="qr-size-label">200</strong>px</span>
-                <input type="range" id="qr-size" min="100" max="400" value="200"
-                  style="width:80px;accent-color:var(--accent)"
-                  oninput="document.getElementById('qr-size-label').textContent=this.value;generateQR()" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ══ 16. FAKE DATA GENERATOR ════════════════════════ -->
-        <div class="tool-card">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-fake">🎲</div>
-              <div>
-                <div class="tool-name">Données Fictives</div>
-                <div class="tool-desc">Générer des jeux de données de test réalistes</div>
-              </div>
-            </div>
-          </div>
-          <div class="tool-sub-label">Champs à inclure</div>
-          <div class="fake-fields-grid">
-            <label class="pwd-option"><input type="checkbox" id="fk-name" checked /> Nom complet</label>
-            <label class="pwd-option"><input type="checkbox" id="fk-email" checked /> Email</label>
-            <label class="pwd-option"><input type="checkbox" id="fk-phone" checked /> Téléphone</label>
-            <label class="pwd-option"><input type="checkbox" id="fk-address" checked /> Adresse</label>
-            <label class="pwd-option"><input type="checkbox" id="fk-company" /> Entreprise</label>
-            <label class="pwd-option"><input type="checkbox" id="fk-job" /> Poste</label>
-            <label class="pwd-option"><input type="checkbox" id="fk-dob" /> Date naissance</label>
-            <label class="pwd-option"><input type="checkbox" id="fk-uuid" /> UUID</label>
-            <label class="pwd-option"><input type="checkbox" id="fk-ip" /> IP</label>
-            <label class="pwd-option"><input type="checkbox" id="fk-website" /> Site web</label>
-          </div>
-          <div style="display:flex;gap:0.75rem;align-items:center;margin:0.6rem 0">
-            <span class="tool-sub-label" style="margin:0">Nb : <strong id="fk-count-label">5</strong></span>
-            <input type="range" id="fk-count" min="1" max="20" value="5" style="flex:1;accent-color:var(--accent)"
-              oninput="document.getElementById('fk-count-label').textContent=this.value" />
-            <select id="fk-format" class="tool-input" style="width:auto">
-              <option value="json">JSON</option>
-              <option value="csv">CSV</option>
-              <option value="sql">SQL INSERT</option>
-            </select>
-          </div>
-          <div class="tool-actions">
-            <button class="btn-tool primary" onclick="generateFakeData()">🎲 Générer</button>
-            <button class="btn-copy-result" onclick="copyToolOutput('fake-output')">⎘ Copier</button>
-          </div>
-          <div class="tool-output" id="fake-output" style="margin-top:0.5rem;max-height:200px">Le résultat apparaîtra
-            ici…</div>
-        </div>
-
-        <!-- ══ 11. DIFF TEXTE ════════════════════════════════ -->
-        <div class="tool-card tool-card-wide">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-diff">⟺</div>
-              <div>
-                <div class="tool-name">Comparateur de Texte</div>
-                <div class="tool-desc">Visualiser les différences entre deux textes</div>
-              </div>
-            </div>
-          </div>
-          <div class="diff-inputs">
-            <div class="diff-col">
-              <div class="tool-sub-label">Texte A (original)</div>
-              <textarea class="tool-textarea" id="diff-a" placeholder="Texte original…" oninput="runDiff()"
-                style="min-height:100px"></textarea>
-            </div>
-            <div class="diff-col">
-              <div class="tool-sub-label">Texte B (modifié)</div>
-              <textarea class="tool-textarea" id="diff-b" placeholder="Texte modifié…" oninput="runDiff()"
-                style="min-height:100px"></textarea>
-            </div>
-          </div>
-          <div class="tool-actions" style="margin-top:0.5rem">
-            <button class="btn-tool primary" onclick="runDiff()">⟺ Comparer</button>
-            <button class="btn-tool" onclick="swapDiff()">⇅ Inverser</button>
-            <button class="btn-tool"
-              onclick="clearTool('diff-a','diff-output');clearTool('diff-b','diff-output')">✕</button>
-            <span id="diff-stats"
-              style="font-size:0.72rem;color:var(--text-muted);margin-left:auto;align-self:center"></span>
-          </div>
-          <div class="tool-output-header">
-            <span class="tool-output-label">Résultat</span>
-          </div>
-          <div class="tool-output diff-output" id="diff-output" style="white-space:pre-wrap;max-height:220px">Les
-            différences apparaîtront ici…</div>
-        </div>
-
-        <!-- ══ 13. CSV ↔ JSON CONVERTER ═══════════════════════ -->
-        <div class="tool-card tool-card-wide">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-csv">⇌</div>
-              <div>
-                <div class="tool-name">Convertisseur CSV ↔ JSON</div>
-                <div class="tool-desc">Conversion bidirectionnelle avec aperçu tableau</div>
-              </div>
-            </div>
-          </div>
-          <div class="diff-inputs">
-            <div class="diff-col">
-              <div class="tool-sub-label">Entrée</div>
-              <textarea class="tool-textarea" id="csv-input" style="min-height:120px"
-                placeholder="nom,age,ville&#10;Alice,30,Paris&#10;Bob,25,Lyon"></textarea>
-              <div class="tool-actions" style="margin-top:0.4rem">
-                <button class="btn-tool primary" onclick="csvToJson()">→ CSV vers JSON</button>
-                <button class="btn-tool" onclick="jsonToCsv()">→ JSON vers CSV</button>
-                <button class="btn-tool" onclick="clearTool('csv-input','csv-output')">✕</button>
-              </div>
-              <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem">
-                <label class="pwd-option"><input type="checkbox" id="csv-header" checked /> En-tête première
-                  ligne</label>
-                <label class="pwd-option">Sep : <input class="tool-input" id="csv-sep" value=","
-                    style="width:36px;padding:0.2rem 0.4rem;margin-left:4px" /></label>
-              </div>
-            </div>
-            <div class="diff-col">
-              <div class="tool-output-header">
-                <span class="tool-output-label">Résultat</span>
-                <button class="btn-copy-result" onclick="copyToolOutput('csv-output')">⎘ Copier</button>
-              </div>
-              <div class="tool-output" id="csv-output" style="min-height:120px">Le résultat apparaîtra ici…</div>
-            </div>
-          </div>
-          <div id="csv-table-wrap" style="margin-top:0.75rem;overflow-x:auto;display:none">
-            <div class="tool-sub-label">Aperçu tableau</div>
-            <table id="csv-table" class="csv-preview-table"></table>
-          </div>
-        </div>
-
-        <!-- ══ 15. MARKDOWN PREVIEW ═══════════════════════════ -->
-        <div class="tool-card tool-card-wide">
-          <div class="tool-header">
-            <div class="tool-title-group">
-              <div class="tool-icon icon-md">MD</div>
-              <div>
-                <div class="tool-name">Éditeur Markdown</div>
-                <div class="tool-desc">Éditeur avec prévisualisation HTML en temps réel</div>
-              </div>
-            </div>
-            <div style="display:flex;gap:0.4rem">
-              <button class="btn-tool" onclick="toggleMdView('split')" id="md-btn-split">Split</button>
-              <button class="btn-tool" onclick="toggleMdView('editor')" id="md-btn-editor">Éditeur</button>
-              <button class="btn-tool" onclick="toggleMdView('preview')" id="md-btn-preview">Preview</button>
-              <button class="btn-tool" onclick="copyMdHtml()">⎘ HTML</button>
-            </div>
-          </div>
-          <div class="md-editor-wrap" id="md-wrap">
-            <textarea class="tool-textarea md-editor" id="md-input"
-              placeholder="# Titre&#10;&#10;Écrivez votre **Markdown** ici…&#10;&#10;- item 1&#10;- item 2&#10;&#10;```js&#10;console.log('hello')&#10;```"
-              oninput="renderMarkdown()" style="min-height:240px;font-size:0.8rem"></textarea>
-            <div class="md-preview" id="md-preview"></div>
-          </div>
-          <div class="tool-actions" style="margin-top:0.5rem">
-            <button class="btn-tool" onclick="insertMd('**','**')"><b>B</b></button>
-            <button class="btn-tool" onclick="insertMd('*','*')"><i>I</i></button>
-            <button class="btn-tool" onclick="insertMd('`','`')">` `</button>
-            <button class="btn-tool" onclick="insertMdLine('# ')">H1</button>
-            <button class="btn-tool" onclick="insertMdLine('## ')">H2</button>
-            <button class="btn-tool" onclick="insertMdLine('- ')">List</button>
-            <button class="btn-tool" onclick="insertMdLine('> ')">Quote</button>
-            <button class="btn-tool" onclick="insertMd('\n```\n','\n```')">Code</button>
-            <button class="btn-tool" onclick="clearTool('md-input','')">✕</button>
-          </div>
-        </div>
-
-      </div><!-- /.tools-grid -->
-    </div><!-- /#view-toolbox -->
-
-  </main>
-
-  <!-- Navigation mobile fixée en bas (visible uniquement sur mobile) -->
-  <nav class="mobile-nav" role="navigation" aria-label="Navigation mobile">
-    <button class="mobile-nav-item active" id="mnav-home" onclick="showView('home'); setMobileNav('home')">
-      <span class="mn-icon">🔍</span>
-      <span>Analyser</span>
-    </button>
-    <button class="mobile-nav-item" id="mnav-arch" onclick="showView('arch'); setMobileNav('arch')">
-      <span class="mn-icon">🌐</span>
-      <span>Graphe</span>
-    </button>
-    <button class="mobile-nav-item" id="mnav-toolbox" onclick="showView('toolbox'); setMobileNav('toolbox')">
-      <span class="mn-icon">🛠</span>
-      <span>Toolbox</span>
-    </button>
-  </nav>
-
-  <!-- ═══════════════════════════════════════════════════════════
-     MODALE TOKEN GITHUB
-════════════════════════════════════════════════════════════ -->
-  <div class="modal-overlay" id="token-modal" onclick="closeTokenModal(event)">
-    <div class="modal-box">
-      <div class="modal-header">
-        <div class="modal-title">
-          <span class="modal-icon">🔑</span>
-          Token GitHub Personnel
-        </div>
-        <button class="modal-close" onclick="closeTokenModal()">✕</button>
       </div>
 
-      <div class="modal-body">
-        <p class="modal-desc">
-          Sans token : <strong>60 req/heure</strong>.<br />
-          Avec token : <strong>5 000 req/heure</strong>.
-        </p>
-
-        <div class="token-steps">
-          <div class="token-step">
-            <span class="step-num">1</span>
-            <span>Aller sur <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener"
-                class="token-link">github.com/settings/tokens</a></span>
-          </div>
-          <div class="token-step">
-            <span class="step-num">2</span>
-            <span>Cliquer <strong>Generate new token (classic)</strong></span>
-          </div>
-          <div class="token-step">
-            <span class="step-num">3</span>
-            <span>Cocher uniquement <code>public_repo</code></span>
-          </div>
-          <div class="token-step">
-            <span class="step-num">4</span>
-            <span>Coller le token ci-dessous</span>
-          </div>
+      <!-- Langages côte à côte -->
+      <div class="compare-two-col">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🎨 Langages — A</div></div>
+          <div id="cmp-langs-a" class="lang-list"></div>
         </div>
-
-        <div class="token-input-group">
-          <label class="tool-sub-label">Votre token GitHub</label>
-          <div class="token-input-row">
-            <input type="password" id="token-input" class="tool-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-              autocomplete="off" spellcheck="false"
-              style="flex:1;font-family:'JetBrains Mono',monospace;font-size:0.82rem" />
-            <button class="btn-tool" id="token-eye" onclick="toggleTokenVisibility()"
-              title="Afficher/masquer">👁</button>
-          </div>
-          <div id="token-status" class="token-status"></div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">🎨 Langages — B</div></div>
+          <div id="cmp-langs-b" class="lang-list"></div>
         </div>
+      </div>
 
-        <div class="modal-actions">
-          <button class="btn-tool" onclick="clearToken()">🗑 Supprimer</button>
-          <button class="btn-analyze" onclick="saveToken()" style="padding:0.55rem 1.25rem">✓ Enregistrer</button>
+      <!-- Score côte à côte -->
+      <div class="compare-two-col">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🎯 Score — A</div></div>
+          <div class="score-display"><div class="score-circle" id="cmp-score-circle-a"><svg class="score-ring" viewBox="0 0 100 100"><circle class="score-ring-bg" cx="50" cy="50" r="42"/><circle class="score-ring-fill" id="cmp-ring-a" cx="50" cy="50" r="42"/></svg><div class="score-inner"><div class="score-grade" id="cmp-grade-a">–</div><div class="score-total" id="cmp-total-a">/100</div></div></div><div class="score-details" id="cmp-details-a"></div></div>
         </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">🎯 Score — B</div></div>
+          <div class="score-display"><div class="score-circle" id="cmp-score-circle-b"><svg class="score-ring" viewBox="0 0 100 100"><circle class="score-ring-bg" cx="50" cy="50" r="42"/><circle class="score-ring-fill" id="cmp-ring-b" cx="50" cy="50" r="42"/></svg><div class="score-inner"><div class="score-grade" id="cmp-grade-b">–</div><div class="score-total" id="cmp-total-b">/100</div></div></div><div class="score-details" id="cmp-details-b"></div></div>
+        </div>
+      </div>
+    </div>
+  </div><!-- /#view-compare -->
 
-        <p style="font-size:0.7rem;color:var(--text-muted);margin-top:0.75rem;text-align:center">
-          🔒 Le token est stocké uniquement dans votre navigateur (localStorage).<br />
-          Il n'est jamais envoyé ailleurs que vers <code>api.github.com</code>.
-        </p>
+
+  <!-- ──────────────────────────────────────────────────────────
+       VIEW : ARCHITECTURE
+  ─────────────────────────────────────────────────────────── -->
+  <div class="view" id="view-arch">
+    <div class="view-page-header">
+      <div>
+        <h2>Visualiseur d'Architecture</h2>
+        <p>Graphe interactif — <span id="arch-hint" style="color:var(--text-muted)">Analysez d'abord un repository.</span></p>
+      </div>
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn-export" onclick="exportGraphSvg()">⬇ SVG</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div id="graph-container">
+        <svg id="graph-canvas"></svg>
+        <div class="graph-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Dossier</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#818cf8"></div>Fichier</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div>Config</div>
+        </div>
+        <div class="graph-controls">
+          <button class="graph-btn" onclick="resetZoom()">⌂</button>
+          <button class="graph-btn" onclick="zoomIn()">+</button>
+          <button class="graph-btn" onclick="zoomOut()">−</button>
+        </div>
+        <div id="graph-placeholder">
+          <div style="font-size:2.5rem">🌐</div>
+          <div>Analysez un repository pour voir le graphe</div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Scripts -->
-  <script src="../assets/js/script.js"></script>
-  <script src="../assets/js/toolbox.js"></script>
+
+  <!-- ──────────────────────────────────────────────────────────
+       VIEW : TOOLBOX
+  ─────────────────────────────────────────────────────────── -->
+  <div class="view" id="view-toolbox">
+    <div class="toolbox-header">
+      <div>
+        <h2>🛠 Boîte à Outils</h2>
+        <p>Outils développeur — tout fonctionne en local, sans serveur.</p>
+      </div>
+      <div class="toolbox-search-wrap">
+        <span class="toolbox-search-icon">🔍</span>
+        <input type="text" id="toolbox-search" class="toolbox-search-input" placeholder="Rechercher un outil…" oninput="filterTools()" />
+      </div>
+    </div>
+
+    <div class="tools-grid" id="tools-grid">
+
+      <!-- ══ 1. JSON FORMATTER ══════════════════════════════ -->
+      <div class="tool-card" data-tool="JSON Formatter formater minifier valider">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-json">{ }</div>
+            <div>
+              <div class="tool-name">JSON Formatter</div>
+              <div class="tool-desc">Formater, minifier et valider du JSON</div>
+            </div>
+          </div>
+        </div>
+        <textarea class="tool-textarea" id="json-input" placeholder='{"nom":"Alice","age":30}'></textarea>
+        <div class="tool-actions">
+          <button class="btn-tool primary" onclick="formatJson()">⚡ Formater</button>
+          <button class="btn-tool" onclick="minifyJson()">⚙ Minifier</button>
+          <button class="btn-tool" onclick="validateJson()">✓ Valider</button>
+          <button class="btn-tool" onclick="clearTool('json-input','json-output')">✕</button>
+        </div>
+        <div class="tool-output-header">
+          <span class="tool-output-label">Résultat</span>
+          <button class="btn-copy-result" onclick="copyToolOutput('json-output')">⎘ Copier</button>
+        </div>
+        <div class="tool-output" id="json-output">Le JSON formaté apparaîtra ici…</div>
+      </div>
+
+      <!-- ══ 2. UUID GENERATOR ══════════════════════════════ -->
+      <div class="tool-card" data-tool="UUID Générateur identifiant unique v4">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-uuid">⬡</div>
+            <div>
+              <div class="tool-name">Générateur UUID</div>
+              <div class="tool-desc">Identifiants uniques v4 dans plusieurs formats</div>
+            </div>
+          </div>
+        </div>
+        <div class="uuid-display" id="uuid-display">Cliquez sur Générer</div>
+        <div class="tool-actions" style="margin-top:0.75rem">
+          <button class="btn-tool primary" onclick="generateUUID()">⚡ Générer</button>
+          <button class="btn-tool" onclick="generateMultipleUUIDs()">×5 Batch</button>
+          <button class="btn-copy-result" onclick="copyToolOutput('uuid-display')">⎘ Copier</button>
+        </div>
+        <div class="tool-sub-label" style="margin-top:0.75rem">Formats</div>
+        <div class="tool-actions">
+          <button class="btn-tool" onclick="generateUUID('uppercase')">MAJUSCULES</button>
+          <button class="btn-tool" onclick="generateUUID('no-hyphens')">Sans tirets</button>
+          <button class="btn-tool" onclick="generateUUID('braces')">{Accolades}</button>
+        </div>
+      </div>
+
+      <!-- ══ 3. BASE64 ══════════════════════════════════════ -->
+      <div class="tool-card" data-tool="Base64 encoder décoder URL-safe">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-base64">64</div>
+            <div>
+              <div class="tool-name">Encodeur Base64</div>
+              <div class="tool-desc">Encoder et décoder en Base64 / URL-safe</div>
+            </div>
+          </div>
+        </div>
+        <textarea class="tool-textarea" id="b64-input" placeholder="Texte à encoder ou Base64 à décoder…"></textarea>
+        <div class="tool-actions">
+          <button class="btn-tool primary" onclick="encodeBase64()">↑ Encoder</button>
+          <button class="btn-tool" onclick="decodeBase64()">↓ Décoder</button>
+          <button class="btn-tool" onclick="encodeUrlSafe()">🔗 URL-safe</button>
+          <button class="btn-tool" onclick="clearTool('b64-input','b64-output')">✕</button>
+        </div>
+        <div class="tool-output-header">
+          <span class="tool-output-label">Résultat</span>
+          <button class="btn-copy-result" onclick="copyToolOutput('b64-output')">⎘ Copier</button>
+        </div>
+        <div class="tool-output" id="b64-output">Le résultat apparaîtra ici…</div>
+      </div>
+
+      <!-- ══ 4. REGEX TESTER ════════════════════════════════ -->
+      <div class="tool-card" data-tool="Regex expression régulière tester pattern">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-regex">.*</div>
+            <div>
+              <div class="tool-name">Testeur Regex</div>
+              <div class="tool-desc">Tester des expressions régulières en live</div>
+            </div>
+          </div>
+        </div>
+        <div class="regex-row">
+          <span class="regex-slash">/</span>
+          <input class="tool-input" id="regex-pattern" placeholder="pattern" oninput="testRegex()" />
+          <span class="regex-slash">/</span>
+          <input class="tool-input regex-flags" id="regex-flags" value="gi" oninput="testRegex()" />
+        </div>
+        <textarea class="tool-textarea" id="regex-text" placeholder="Texte à tester…" oninput="testRegex()" style="margin-top:0.5rem;min-height:70px"></textarea>
+        <div class="tool-sub-label" style="margin-top:0.5rem">Patterns rapides</div>
+        <div class="tool-actions">
+          <button class="btn-tool" onclick="setRegexPreset('email')">Email</button>
+          <button class="btn-tool" onclick="setRegexPreset('url')">URL</button>
+          <button class="btn-tool" onclick="setRegexPreset('ip')">IP</button>
+          <button class="btn-tool" onclick="setRegexPreset('phone')">Tél</button>
+          <button class="btn-tool" onclick="setRegexPreset('date')">Date</button>
+          <button class="btn-tool" onclick="setRegexPreset('hex')">Hex</button>
+        </div>
+        <div class="tool-output-header">
+          <span class="tool-output-label" id="regex-count">Matches : –</span>
+          <button class="btn-copy-result" onclick="copyToolOutput('regex-output')">⎘ Copier</button>
+        </div>
+        <div class="tool-output" id="regex-output">Entrez un pattern et un texte…</div>
+      </div>
+
+      <!-- ══ 5. TIMESTAMP ═══════════════════════════════════ -->
+      <div class="tool-card" data-tool="Timestamp Unix date convertisseur horloge">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-time">⏱</div>
+            <div>
+              <div class="tool-name">Convertisseur Timestamp</div>
+              <div class="tool-desc">Unix timestamp ↔ date lisible</div>
+            </div>
+          </div>
+        </div>
+        <div class="tool-sub-label">Timestamp Unix → Date</div>
+        <div class="tool-actions" style="margin-bottom:0.5rem">
+          <input class="tool-input" id="ts-input" type="number" placeholder="1700000000" oninput="convertTimestamp()" style="flex:1" />
+          <button class="btn-tool" onclick="document.getElementById('ts-input').value=Math.floor(Date.now()/1000);convertTimestamp()">Maintenant</button>
+        </div>
+        <div class="ts-grid">
+          <div class="ts-item"><div class="ts-label">UTC</div><div class="ts-value" id="ts-utc">–</div></div>
+          <div class="ts-item"><div class="ts-label">Locale</div><div class="ts-value" id="ts-local">–</div></div>
+          <div class="ts-item"><div class="ts-label">ISO 8601</div><div class="ts-value" id="ts-iso">–</div></div>
+          <div class="ts-item"><div class="ts-label">Relative</div><div class="ts-value" id="ts-relative">–</div></div>
+        </div>
+        <div class="tool-sub-label" style="margin-top:0.75rem">Date → Timestamp Unix</div>
+        <input class="tool-input" id="date-input" type="datetime-local" oninput="convertDate()" style="width:100%;margin-bottom:0.4rem" />
+        <div class="tool-output-header">
+          <span class="tool-output-label">Résultat</span>
+          <button class="btn-copy-result" onclick="copyToolOutput('date-output')">⎘</button>
+        </div>
+        <div class="tool-output" id="date-output" style="min-height:auto;padding:0.5rem">–</div>
+        <div style="margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border)">
+          <div class="tool-sub-label">Horloge Unix live</div>
+          <div id="ts-live" style="font-family:'Space Mono',monospace;font-size:1rem;color:var(--accent);letter-spacing:2px">–</div>
+        </div>
+      </div>
+
+      <!-- ══ 6. URL ENCODER ═════════════════════════════════ -->
+      <div class="tool-card" data-tool="URL encoder décoder parser paramètres">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-url">🔗</div>
+            <div>
+              <div class="tool-name">URL Encoder / Parser</div>
+              <div class="tool-desc">Encoder, décoder et décomposer une URL</div>
+            </div>
+          </div>
+        </div>
+        <textarea class="tool-textarea" id="url-input" placeholder="https://example.com/path?foo=hello world&bar=café" style="min-height:70px"></textarea>
+        <div class="tool-actions">
+          <button class="btn-tool primary" onclick="encodeUrl()">↑ Encoder</button>
+          <button class="btn-tool" onclick="decodeUrl()">↓ Décoder</button>
+          <button class="btn-tool" onclick="parseUrl()">🔍 Parser</button>
+          <button class="btn-tool" onclick="clearTool('url-input','url-output')">✕</button>
+        </div>
+        <div class="tool-output-header">
+          <span class="tool-output-label">Résultat</span>
+          <button class="btn-copy-result" onclick="copyToolOutput('url-output')">⎘ Copier</button>
+        </div>
+        <div class="tool-output" id="url-output">Le résultat apparaîtra ici…</div>
+      </div>
+
+      <!-- ══ 7. MOT DE PASSE ════════════════════════════════ -->
+      <div class="tool-card" data-tool="mot de passe générateur sécurité fort">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-pwd">🔐</div>
+            <div>
+              <div class="tool-name">Générateur de Mot de Passe</div>
+              <div class="tool-desc">Mots de passe forts et personnalisables</div>
+            </div>
+          </div>
+        </div>
+        <div class="pwd-display-wrap">
+          <div class="uuid-display" id="pwd-display" style="font-size:0.85rem;word-break:break-all">Cliquez sur Générer</div>
+          <button class="btn-copy-result" onclick="copyToolOutput('pwd-display')" style="margin-top:0.4rem;align-self:flex-end">⎘ Copier</button>
+        </div>
+        <div class="pwd-options">
+          <label class="pwd-option"><input type="checkbox" id="pwd-upper" checked /> Majuscules (A-Z)</label>
+          <label class="pwd-option"><input type="checkbox" id="pwd-lower" checked /> Minuscules (a-z)</label>
+          <label class="pwd-option"><input type="checkbox" id="pwd-numbers" checked /> Chiffres (0-9)</label>
+          <label class="pwd-option"><input type="checkbox" id="pwd-symbols" /> Symboles (!@#$…)</label>
+        </div>
+        <div class="pwd-length-row">
+          <span class="tool-sub-label" style="margin:0">Longueur : <strong id="pwd-len-label">16</strong></span>
+          <input type="range" id="pwd-length" min="8" max="64" value="16" oninput="document.getElementById('pwd-len-label').textContent=this.value" style="flex:1;accent-color:var(--accent)" />
+        </div>
+        <div class="tool-actions" style="margin-top:0.5rem">
+          <button class="btn-tool primary" onclick="generatePassword()">⚡ Générer</button>
+          <button class="btn-tool" onclick="generateMultiplePasswords()">×5 Batch</button>
+        </div>
+        <div id="pwd-strength" class="pwd-strength-bar" style="margin-top:0.6rem"></div>
+      </div>
+
+      <!-- ══ 8. CONVERTISSEUR COULEURS ══════════════════════ -->
+      <div class="tool-card" data-tool="couleur convertisseur HEX RGB HSL picker">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-color">🎨</div>
+            <div>
+              <div class="tool-name">Convertisseur Couleurs</div>
+              <div class="tool-desc">HEX ↔ RGB ↔ HSL en temps réel</div>
+            </div>
+          </div>
+        </div>
+        <div class="color-preview-row">
+          <input type="color" id="color-picker" value="#38bdf8" oninput="onColorPickerChange()" class="color-picker-native" />
+          <div class="color-preview-swatch" id="color-swatch" style="background:#38bdf8"></div>
+          <span id="color-name" style="font-size:0.75rem;color:var(--text-secondary)">Sky Blue</span>
+        </div>
+        <div class="color-inputs-grid">
+          <div class="color-input-group"><label class="tool-sub-label">HEX</label><input class="tool-input" id="color-hex" value="#38bdf8" oninput="convertFromHex()" placeholder="#rrggbb" /></div>
+          <div class="color-input-group"><label class="tool-sub-label">RGB</label><input class="tool-input" id="color-rgb" value="56, 189, 248" oninput="convertFromRgb()" placeholder="r, g, b" /></div>
+          <div class="color-input-group"><label class="tool-sub-label">HSL</label><input class="tool-input" id="color-hsl" value="199°, 92%, 60%" oninput="convertFromHsl()" placeholder="h°, s%, l%" /></div>
+          <div class="color-input-group"><label class="tool-sub-label">CSS</label><input class="tool-input" id="color-css" readonly style="cursor:pointer" onclick="copyToolOutput('color-css')" /></div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.5rem">
+          <button class="btn-tool" onclick="copyField('color-hex')">⎘ HEX</button>
+          <button class="btn-tool" onclick="copyField('color-rgb')">⎘ RGB</button>
+          <button class="btn-tool" onclick="copyField('color-hsl')">⎘ HSL</button>
+        </div>
+      </div>
+
+      <!-- ══ 9. COMPTEUR TEXTE ══════════════════════════════ -->
+      <div class="tool-card" data-tool="texte compteur mots caractères lignes lecture">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-text">Aa</div>
+            <div>
+              <div class="tool-name">Compteur de Texte</div>
+              <div class="tool-desc">Caractères, mots, lignes, temps de lecture</div>
+            </div>
+          </div>
+        </div>
+        <textarea class="tool-textarea" id="text-input" placeholder="Collez votre texte ici…" oninput="analyzeText()" style="min-height:100px"></textarea>
+        <div class="text-stats-grid">
+          <div class="ts-item"><div class="ts-label">Caractères</div><div class="ts-value" id="tc-chars">0</div></div>
+          <div class="ts-item"><div class="ts-label">Sans espaces</div><div class="ts-value" id="tc-nospace">0</div></div>
+          <div class="ts-item"><div class="ts-label">Mots</div><div class="ts-value" id="tc-words">0</div></div>
+          <div class="ts-item"><div class="ts-label">Lignes</div><div class="ts-value" id="tc-lines">0</div></div>
+          <div class="ts-item"><div class="ts-label">Phrases</div><div class="ts-value" id="tc-sentences">0</div></div>
+          <div class="ts-item"><div class="ts-label">Lecture ~</div><div class="ts-value" id="tc-read">0s</div></div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.5rem">
+          <button class="btn-tool" onclick="textToUpper()">UPPER</button>
+          <button class="btn-tool" onclick="textToLower()">lower</button>
+          <button class="btn-tool" onclick="textToTitleCase()">Title</button>
+          <button class="btn-tool" onclick="trimText()">Trim</button>
+          <button class="btn-tool" onclick="clearTool('text-input','')">✕</button>
+        </div>
+      </div>
+
+      <!-- ══ 10. FORMATEUR DE NOMBRES ═══════════════════════ -->
+      <div class="tool-card" data-tool="nombre bytes durée binaire hexadécimal formateur">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-num">#</div>
+            <div>
+              <div class="tool-name">Formateur de Nombres</div>
+              <div class="tool-desc">Bytes, durées, bases numériques</div>
+            </div>
+          </div>
+        </div>
+        <input class="tool-input" id="num-input" type="number" placeholder="Entrez un nombre…" oninput="formatNumber()" style="width:100%;margin-bottom:0.6rem" />
+        <div class="ts-grid">
+          <div class="ts-item"><div class="ts-label">Formaté FR</div><div class="ts-value" id="nf-fr">–</div></div>
+          <div class="ts-item"><div class="ts-label">Formaté EN</div><div class="ts-value" id="nf-en">–</div></div>
+          <div class="ts-item"><div class="ts-label">Binaire</div><div class="ts-value" id="nf-bin">–</div></div>
+          <div class="ts-item"><div class="ts-label">Hexadécimal</div><div class="ts-value" id="nf-hex">–</div></div>
+          <div class="ts-item"><div class="ts-label">Octal</div><div class="ts-value" id="nf-oct">–</div></div>
+          <div class="ts-item"><div class="ts-label">Taille (bytes)</div><div class="ts-value" id="nf-bytes">–</div></div>
+          <div class="ts-item"><div class="ts-label">Durée (sec)</div><div class="ts-value" id="nf-duration">–</div></div>
+          <div class="ts-item"><div class="ts-label">Scientifique</div><div class="ts-value" id="nf-sci">–</div></div>
+        </div>
+      </div>
+
+      <!-- ══ 11. ÉDITEUR DE CODE ════════════════════════════ -->
+      <div class="tool-card tool-card-wide" data-tool="code éditeur coloration syntaxique highlight">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-code">&lt;/&gt;</div>
+            <div>
+              <div class="tool-name">Éditeur de Code</div>
+              <div class="tool-desc">Coloration syntaxique, formatage, copie</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <select id="code-lang" class="tool-input" style="width:auto" onchange="highlightCode()">
+              <option value="javascript">JavaScript</option>
+              <option value="typescript">TypeScript</option>
+              <option value="python">Python</option>
+              <option value="html">HTML</option>
+              <option value="css">CSS</option>
+              <option value="json">JSON</option>
+              <option value="bash">Bash</option>
+              <option value="sql">SQL</option>
+              <option value="java">Java</option>
+              <option value="rust">Rust</option>
+              <option value="go">Go</option>
+              <option value="php">PHP</option>
+            </select>
+            <button class="btn-tool" onclick="copyToolOutput('code-output')">⎘ Copier</button>
+          </div>
+        </div>
+        <div class="code-editor-wrap">
+          <textarea class="tool-textarea code-textarea" id="code-input"
+            placeholder="// Collez votre code ici…&#10;function hello() {&#10;  console.log('Hello World');&#10;}"
+            oninput="highlightCode()" spellcheck="false" style="min-height:180px;font-family:'Space Mono',monospace;font-size:0.8rem"></textarea>
+          <div class="code-preview-wrap">
+            <pre><code id="code-output" class="hljs"></code></pre>
+          </div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.5rem">
+          <button class="btn-tool primary" onclick="highlightCode()">▶ Highlight</button>
+          <button class="btn-tool" onclick="formatCodeJson()">{ } Format JSON</button>
+          <button class="btn-tool" onclick="document.getElementById('code-input').value='';highlightCode()">✕</button>
+          <span id="code-line-count" style="margin-left:auto;font-size:0.7rem;color:var(--text-muted);align-self:center"></span>
+        </div>
+      </div>
+
+      <!-- ══ 12. GÉNÉRATEUR DE PALETTE ══════════════════════ -->
+      <div class="tool-card tool-card-wide" data-tool="palette couleurs générateur harmonies complémentaires">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-palette">◐</div>
+            <div>
+              <div class="tool-name">Générateur de Palette</div>
+              <div class="tool-desc">Harmonies de couleurs — complémentaire, triade, analogue…</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <input type="color" id="palette-seed" value="#38bdf8" oninput="generatePalette()" class="color-picker-native" style="width:36px;height:36px" />
+            <button class="btn-tool primary" onclick="generatePalette()">⚡ Générer</button>
+            <button class="btn-tool" onclick="randomPaletteColor()">🎲 Aléatoire</button>
+          </div>
+        </div>
+        <div class="palette-modes">
+          <button class="palette-mode active" id="pm-complementary" onclick="setPaletteMode('complementary')">Complémentaire</button>
+          <button class="palette-mode" id="pm-triadic"       onclick="setPaletteMode('triadic')">Triade</button>
+          <button class="palette-mode" id="pm-analogous"     onclick="setPaletteMode('analogous')">Analogue</button>
+          <button class="palette-mode" id="pm-split"         onclick="setPaletteMode('split')">Split-comp</button>
+          <button class="palette-mode" id="pm-tetradic"      onclick="setPaletteMode('tetradic')">Tétradique</button>
+          <button class="palette-mode" id="pm-monochromatic" onclick="setPaletteMode('monochromatic')">Monochrome</button>
+          <button class="palette-mode" id="pm-shades"        onclick="setPaletteMode('shades')">Nuances</button>
+        </div>
+        <div class="palette-display" id="palette-display"></div>
+        <div class="tool-actions" style="margin-top:0.75rem">
+          <button class="btn-tool" onclick="copyPaletteCSS()">⎘ Variables CSS</button>
+          <button class="btn-tool" onclick="copyPaletteJSON()">⎘ JSON</button>
+          <button class="btn-tool" onclick="copyPaletteTailwind()">⎘ Tailwind</button>
+        </div>
+        <div class="tool-output" id="palette-output" style="margin-top:0.5rem;min-height:auto;display:none"></div>
+      </div>
+
+      <!-- ══ 13. QR CODE ════════════════════════════════════ -->
+      <div class="tool-card" data-tool="QR code générateur SVG URL WiFi email">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-qr">▦</div>
+            <div>
+              <div class="tool-name">Générateur QR Code</div>
+              <div class="tool-desc">Texte, URL, email, WiFi → QR Code SVG</div>
+            </div>
+          </div>
+        </div>
+        <div class="tool-sub-label">Type</div>
+        <div class="tool-actions" style="margin-bottom:0.6rem">
+          <button class="btn-tool primary" id="qr-type-url" onclick="setQrType('url')">URL</button>
+          <button class="btn-tool" id="qr-type-text" onclick="setQrType('text')">Texte</button>
+          <button class="btn-tool" id="qr-type-email" onclick="setQrType('email')">Email</button>
+          <button class="btn-tool" id="qr-type-wifi" onclick="setQrType('wifi')">WiFi</button>
+          <button class="btn-tool" id="qr-type-tel" onclick="setQrType('tel')">Tél</button>
+        </div>
+        <div id="qr-fields">
+          <input class="tool-input" id="qr-input" style="width:100%" placeholder="https://example.com" oninput="generateQR()" />
+        </div>
+        <div id="qr-wifi-fields" style="display:none;flex-direction:column;gap:0.4rem;margin-top:0.4rem">
+          <input class="tool-input" id="qr-wifi-ssid" placeholder="Nom du réseau (SSID)" oninput="generateQR()" />
+          <input class="tool-input" id="qr-wifi-pass" placeholder="Mot de passe" oninput="generateQR()" />
+          <select id="qr-wifi-enc" class="tool-input" onchange="generateQR()"><option value="WPA">WPA/WPA2</option><option value="WEP">WEP</option><option value="nopass">Aucune</option></select>
+        </div>
+        <div id="qr-email-fields" style="display:none;flex-direction:column;gap:0.4rem;margin-top:0.4rem">
+          <input class="tool-input" id="qr-email-to" placeholder="destinataire@email.com" oninput="generateQR()" />
+          <input class="tool-input" id="qr-email-subject" placeholder="Sujet" oninput="generateQR()" />
+          <textarea class="tool-textarea" id="qr-email-body" placeholder="Corps" style="min-height:50px" oninput="generateQR()"></textarea>
+        </div>
+        <div class="qr-preview-area">
+          <div id="qr-canvas-wrap">
+            <div id="qr-placeholder">Entrez du contenu pour générer le QR Code</div>
+          </div>
+          <div class="qr-actions">
+            <button class="btn-tool primary" onclick="downloadQR()">⬇ SVG</button>
+            <button class="btn-tool" onclick="copyQRSvg()">⎘ Copier</button>
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto">
+              <span class="tool-sub-label" style="margin:0;white-space:nowrap"><strong id="qr-size-label">200</strong>px</span>
+              <input type="range" id="qr-size" min="100" max="400" value="200" style="width:80px;accent-color:var(--accent)" oninput="document.getElementById('qr-size-label').textContent=this.value;generateQR()" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ 14. DIFF TEXTE ════════════════════════════════ -->
+      <div class="tool-card tool-card-wide" data-tool="diff comparateur texte différences">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-diff">⟺</div>
+            <div>
+              <div class="tool-name">Comparateur de Texte</div>
+              <div class="tool-desc">Visualiser les différences entre deux textes</div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-inputs">
+          <div class="diff-col">
+            <div class="tool-sub-label">Texte A (original)</div>
+            <textarea class="tool-textarea" id="diff-a" placeholder="Texte original…" oninput="runDiff()" style="min-height:100px"></textarea>
+          </div>
+          <div class="diff-col">
+            <div class="tool-sub-label">Texte B (modifié)</div>
+            <textarea class="tool-textarea" id="diff-b" placeholder="Texte modifié…" oninput="runDiff()" style="min-height:100px"></textarea>
+          </div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.5rem">
+          <button class="btn-tool primary" onclick="runDiff()">⟺ Comparer</button>
+          <button class="btn-tool" onclick="swapDiff()">⇅ Inverser</button>
+          <button class="btn-tool" onclick="clearTool('diff-a','diff-output');clearTool('diff-b','diff-output')">✕</button>
+          <span id="diff-stats" style="font-size:0.72rem;color:var(--text-muted);margin-left:auto;align-self:center"></span>
+        </div>
+        <div class="tool-output-header"><span class="tool-output-label">Résultat</span></div>
+        <div class="tool-output diff-output" id="diff-output" style="white-space:pre-wrap;max-height:220px">Les différences apparaîtront ici…</div>
+      </div>
+
+      <!-- ══ 15. CSV ↔ JSON ════════════════════════════════ -->
+      <div class="tool-card tool-card-wide" data-tool="CSV JSON convertisseur tableau données">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-csv">⇌</div>
+            <div>
+              <div class="tool-name">Convertisseur CSV ↔ JSON</div>
+              <div class="tool-desc">Conversion bidirectionnelle avec aperçu tableau</div>
+            </div>
+          </div>
+        </div>
+        <div class="diff-inputs">
+          <div class="diff-col">
+            <div class="tool-sub-label">Entrée</div>
+            <textarea class="tool-textarea" id="csv-input" style="min-height:120px" placeholder="nom,age,ville&#10;Alice,30,Paris&#10;Bob,25,Lyon"></textarea>
+            <div class="tool-actions" style="margin-top:0.4rem">
+              <button class="btn-tool primary" onclick="csvToJson()">→ CSV vers JSON</button>
+              <button class="btn-tool" onclick="jsonToCsv()">→ JSON vers CSV</button>
+              <button class="btn-tool" onclick="clearTool('csv-input','csv-output')">✕</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem">
+              <label class="pwd-option"><input type="checkbox" id="csv-header" checked /> En-tête</label>
+              <label class="pwd-option">Sep : <input class="tool-input" id="csv-sep" value="," style="width:36px;padding:0.2rem 0.4rem;margin-left:4px" /></label>
+            </div>
+          </div>
+          <div class="diff-col">
+            <div class="tool-output-header">
+              <span class="tool-output-label">Résultat</span>
+              <button class="btn-copy-result" onclick="copyToolOutput('csv-output')">⎘ Copier</button>
+            </div>
+            <div class="tool-output" id="csv-output" style="min-height:120px">Le résultat apparaîtra ici…</div>
+          </div>
+        </div>
+        <div id="csv-table-wrap" style="margin-top:0.75rem;overflow-x:auto;display:none">
+          <div class="tool-sub-label">Aperçu tableau</div>
+          <table id="csv-table" class="csv-preview-table"></table>
+        </div>
+      </div>
+
+      <!-- ══ 16. MARKDOWN ══════════════════════════════════ -->
+      <div class="tool-card tool-card-wide" data-tool="markdown éditeur preview HTML rendu">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-md">MD</div>
+            <div>
+              <div class="tool-name">Éditeur Markdown</div>
+              <div class="tool-desc">Éditeur avec prévisualisation HTML en temps réel</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.4rem">
+            <button class="btn-tool" onclick="toggleMdView('split')" id="md-btn-split">Split</button>
+            <button class="btn-tool" onclick="toggleMdView('editor')" id="md-btn-editor">Éditeur</button>
+            <button class="btn-tool" onclick="toggleMdView('preview')" id="md-btn-preview">Preview</button>
+            <button class="btn-tool" onclick="copyMdHtml()">⎘ HTML</button>
+          </div>
+        </div>
+        <div class="md-editor-wrap" id="md-wrap">
+          <textarea class="tool-textarea md-editor" id="md-input" placeholder="# Titre&#10;&#10;Écrivez votre **Markdown** ici…" oninput="renderMarkdown()" style="min-height:240px;font-size:0.8rem"></textarea>
+          <div class="md-preview" id="md-preview"></div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.5rem">
+          <button class="btn-tool" onclick="insertMd('**','**')"><b>B</b></button>
+          <button class="btn-tool" onclick="insertMd('*','*')"><i>I</i></button>
+          <button class="btn-tool" onclick="insertMd('`','`')">` `</button>
+          <button class="btn-tool" onclick="insertMdLine('# ')">H1</button>
+          <button class="btn-tool" onclick="insertMdLine('## ')">H2</button>
+          <button class="btn-tool" onclick="insertMdLine('- ')">List</button>
+          <button class="btn-tool" onclick="insertMdLine('> ')">Quote</button>
+          <button class="btn-tool" onclick="insertMd('\n```\n','\n```')">Code</button>
+          <button class="btn-tool" onclick="clearTool('md-input','')">✕</button>
+        </div>
+      </div>
+
+      <!-- ══ 17. HASH CALCULATOR ════════════════════════════ -->
+      <div class="tool-card" data-tool="hash SHA MD5 calculatrice checksum">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-hash">#⃣</div>
+            <div>
+              <div class="tool-name">Calculatrice de Hash</div>
+              <div class="tool-desc">SHA-1, SHA-256, SHA-512</div>
+            </div>
+          </div>
+        </div>
+        <textarea class="tool-textarea" id="hash-input" placeholder="Texte à hasher…" oninput="computeHashes()" style="min-height:70px"></textarea>
+        <div style="display:flex;gap:0.5rem;align-items:center;margin:0.5rem 0">
+          <label class="pwd-option"><input type="checkbox" id="hash-file-mode" onchange="toggleHashFileMode()" /> Fichier</label>
+          <input type="file" id="hash-file" style="display:none" onchange="hashFile()" />
+          <button class="btn-tool" id="hash-file-btn" style="display:none" onclick="document.getElementById('hash-file').click()">📂 Fichier</button>
+        </div>
+        <div class="hash-results">
+          <div class="hash-row"><span class="hash-algo">SHA-1</span><span class="hash-value" id="h-sha1">–</span><button class="btn-copy-result" onclick="copyField2('h-sha1')">⎘</button></div>
+          <div class="hash-row"><span class="hash-algo">SHA-256</span><span class="hash-value" id="h-sha256">–</span><button class="btn-copy-result" onclick="copyField2('h-sha256')">⎘</button></div>
+          <div class="hash-row"><span class="hash-algo">SHA-512</span><span class="hash-value" id="h-sha512">–</span><button class="btn-copy-result" onclick="copyField2('h-sha512')">⎘</button></div>
+        </div>
+        <div style="margin-top:0.6rem">
+          <div class="tool-sub-label">Vérifier un hash</div>
+          <div style="display:flex;gap:0.5rem">
+            <input class="tool-input" id="hash-check" placeholder="Collez un hash à comparer…" oninput="checkHash()" style="flex:1" />
+            <span id="hash-check-result" style="font-size:0.8rem;align-self:center;min-width:60px"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ 18. DONNÉES FICTIVES ════════════════════════════ -->
+      <div class="tool-card" data-tool="données fictives fake générateur test JSON CSV SQL">
+        <div class="tool-header">
+          <div class="tool-title-group">
+            <div class="tool-icon icon-fake">🎲</div>
+            <div>
+              <div class="tool-name">Données Fictives</div>
+              <div class="tool-desc">Générer des jeux de données de test réalistes</div>
+            </div>
+          </div>
+        </div>
+        <div class="tool-sub-label">Champs à inclure</div>
+        <div class="fake-fields-grid">
+          <label class="pwd-option"><input type="checkbox" id="fk-name" checked /> Nom complet</label>
+          <label class="pwd-option"><input type="checkbox" id="fk-email" checked /> Email</label>
+          <label class="pwd-option"><input type="checkbox" id="fk-phone" checked /> Téléphone</label>
+          <label class="pwd-option"><input type="checkbox" id="fk-address" checked /> Adresse</label>
+          <label class="pwd-option"><input type="checkbox" id="fk-company" /> Entreprise</label>
+          <label class="pwd-option"><input type="checkbox" id="fk-job" /> Poste</label>
+          <label class="pwd-option"><input type="checkbox" id="fk-dob" /> Date naissance</label>
+          <label class="pwd-option"><input type="checkbox" id="fk-uuid" /> UUID</label>
+          <label class="pwd-option"><input type="checkbox" id="fk-ip" /> IP</label>
+          <label class="pwd-option"><input type="checkbox" id="fk-website" /> Site web</label>
+        </div>
+        <div style="display:flex;gap:0.75rem;align-items:center;margin:0.6rem 0">
+          <span class="tool-sub-label" style="margin:0">Nb : <strong id="fk-count-label">5</strong></span>
+          <input type="range" id="fk-count" min="1" max="20" value="5" style="flex:1;accent-color:var(--accent)" oninput="document.getElementById('fk-count-label').textContent=this.value" />
+          <select id="fk-format" class="tool-input" style="width:auto">
+            <option value="json">JSON</option>
+            <option value="csv">CSV</option>
+            <option value="sql">SQL INSERT</option>
+          </select>
+        </div>
+        <div class="tool-actions">
+          <button class="btn-tool primary" onclick="generateFakeData()">🎲 Générer</button>
+          <button class="btn-copy-result" onclick="copyToolOutput('fake-output')">⎘ Copier</button>
+        </div>
+        <div class="tool-output" id="fake-output" style="margin-top:0.5rem;max-height:200px">Le résultat apparaîtra ici…</div>
+      </div>
+
+    </div><!-- /.tools-grid -->
+
+    <!-- No results message -->
+    <div id="tools-no-results" style="display:none;text-align:center;padding:3rem;color:var(--text-muted)">
+      <div style="font-size:2rem;margin-bottom:0.5rem">🔍</div>
+      <div>Aucun outil ne correspond à votre recherche.</div>
+    </div>
+
+  </div><!-- /#view-toolbox -->
+
+</main>
+
+<!-- ═══ MOBILE NAV ════════════════════════════════════════════ -->
+<nav class="mobile-nav">
+  <button class="mobile-nav-item active" id="mnav-home"    onclick="showView('home');setMobileNav('home')">
+    <span class="mn-icon">🔍</span><span>Analyser</span>
+  </button>
+  <button class="mobile-nav-item" id="mnav-compare" onclick="showView('compare');setMobileNav('compare')">
+    <span class="mn-icon">⚖</span><span>Comparer</span>
+  </button>
+  <button class="mobile-nav-item" id="mnav-arch"    onclick="showView('arch');setMobileNav('arch')">
+    <span class="mn-icon">🌐</span><span>Graphe</span>
+  </button>
+  <button class="mobile-nav-item" id="mnav-toolbox" onclick="showView('toolbox');setMobileNav('toolbox')">
+    <span class="mn-icon">🛠</span><span>Outils</span>
+  </button>
+</nav>
+
+<!-- ═══ MODALE TOKEN ═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="token-modal" onclick="closeTokenModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title"><span class="modal-icon">🔑</span> Token GitHub</div>
+      <button class="modal-close" onclick="closeTokenModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">Sans token : <strong>60 req/heure</strong>. Avec token : <strong>5 000 req/heure</strong>.</p>
+      <div class="token-steps">
+        <div class="token-step"><span class="step-num">1</span><span>Aller sur <a href="https://github.com/settings/tokens/new" target="_blank" class="token-link">github.com/settings/tokens</a></span></div>
+        <div class="token-step"><span class="step-num">2</span><span>Cliquer <strong>Generate new token (classic)</strong></span></div>
+        <div class="token-step"><span class="step-num">3</span><span>Cocher uniquement <code>public_repo</code></span></div>
+        <div class="token-step"><span class="step-num">4</span><span>Coller le token ci-dessous</span></div>
+      </div>
+      <div class="token-input-group">
+        <label class="tool-sub-label">Votre token GitHub</label>
+        <div class="token-input-row">
+          <input type="password" id="token-input" class="tool-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false" style="flex:1;font-family:'Space Mono',monospace;font-size:0.82rem" />
+          <button class="btn-tool" onclick="toggleTokenVisibility()">👁</button>
+        </div>
+        <div id="token-status" class="token-status"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-tool" onclick="clearToken()">🗑 Supprimer</button>
+        <button class="btn-analyze" onclick="saveToken()" style="padding:0.55rem 1.25rem">✓ Enregistrer</button>
+      </div>
+      <p style="font-size:0.7rem;color:var(--text-muted);margin-top:0.75rem;text-align:center">🔒 Stocké uniquement dans votre navigateur (localStorage). Jamais envoyé ailleurs que <code>api.github.com</code>.</p>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/script.js"></script>
+<script src="../assets/js/toolbox.js"></script>
 
 </body>
-
 </html>
